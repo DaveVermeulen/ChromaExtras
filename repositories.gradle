@@ -1,5 +1,11 @@
 // Add any additional repositories for your dependencies here.
 
 repositories {
-
+    maven {
+        url = "https://cursemaven.com"
+    }
+    maven {
+        // Needed to resolve com.github.* coordinates such as com.github.unilock:DragonFixes
+        url = "https://jitpack.io"
+    }
 }
