@@ -7,6 +7,7 @@
     "compatibilityLevel": "JAVA_8",
     "mixins": [
         "AccessorWorldGenInterceptionRegistry",
+        "MixinAE2ExportProcess",
         "MixinBlockPylonStructure",
         "MixinCaveIndicatorGenerator",
         "MixinChromaDimensionFeatures",
@@ -16,6 +17,7 @@
         "MixinDungeonGenerator",
         "MixinEndOverhaulIsland",
         "MixinEndOverhaulManager",
+        "MixinForestryHandler",
         "MixinGlowingCliffsAuxGenerator",
         "MixinLavaRiverGenerator",
         "MixinLumaGenerator",
@@ -29,6 +31,8 @@
         "MixinWorldGenTreeClusterShape"
     ],
     "client": [
+        "MixinChromaBookGui",
+        "MixinDEHudHandler",
         "MixinReikaRenderHelper",
         "MixinTessellator"
     ]

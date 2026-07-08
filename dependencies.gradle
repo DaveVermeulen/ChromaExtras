@@ -40,4 +40,13 @@ dependencies {
     // environment/modpack, so we only need them at compile time (not published, not bundled).
     compileOnly(rfg.deobf("curse.maven:dragonapi-235591:4722480"))
     compileOnly(rfg.deobf("curse.maven:chromaticraft-235590:4721192"))
+
+    // GTNH AE2 rv3 - only needed at compile time so the mixin annotation processor can resolve the
+    // appeng.services.export.ExportProcess target. Provided at runtime by the modpack. This is a deobfuscated
+    // "-dev" jar (already MCP-named), so it is referenced directly without rfg.deobf.
+    compileOnly(files("libs/appliedenergistics2-rv3-beta-1002-GTNH-dev.jar"))
+
+    // GTNH Draconic Evolution - compile-time only, so the mixin annotation processor can resolve the
+    // HudHandler target (its armor HUD leaks GL blend/alpha state behind open GUIs). Deobfuscated "-dev" jar.
+    compileOnly(files("libs/Draconic-Evolution-1.5.28-GTNH-dev.jar"))
 }
