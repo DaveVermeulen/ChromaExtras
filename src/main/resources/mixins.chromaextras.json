@@ -6,22 +6,30 @@
     "target": "@env(DEFAULT)",
     "compatibilityLevel": "JAVA_8",
     "mixins": [
+        "AccessorWorldGenInterceptionRegistry",
         "MixinBlockPylonStructure",
         "MixinCaveIndicatorGenerator",
+        "MixinChromaDimensionFeatures",
         "MixinColorTreeGenerator",
+        "MixinControllableOreVein",
         "MixinCrystalGenerator",
         "MixinDungeonGenerator",
         "MixinEndOverhaulIsland",
         "MixinEndOverhaulManager",
-        "MixinGlowingCliffsAuxIsland",
+        "MixinGlowingCliffsAuxGenerator",
+        "MixinLavaRiverGenerator",
         "MixinLumaGenerator",
+        "MixinNetherStructureGenerator",
         "MixinPylonGenerator",
         "MixinTieredPlants",
         "MixinStructuredBlockArray",
         "MixinTieredWorldGenerator",
-        "MixinTreeShaper"
+        "MixinTreeShaper",
+        "MixinWorldGenTreeCluster",
+        "MixinWorldGenTreeClusterShape"
     ],
     "client": [
-        "MixinReikaRenderHelper"
+        "MixinReikaRenderHelper",
+        "MixinTessellator"
     ]
 }
