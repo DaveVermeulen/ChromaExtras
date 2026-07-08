@@ -35,11 +35,9 @@
  */
 dependencies {
     //runtimeOnlyNonPublishable("com.github.GTNewHorizons:NotEnoughItems:2.7.69-GTNH:dev")
-    api(rfg.deobf("curse.maven:dragonapi-235591:4722480"))
-    api(rfg.deobf("curse.maven:chromaticraft-235590:4721192"))
-    // Local dev jar (already deobfuscated) - JitPack build for 2.6.0 is broken, so we consume it directly.
-    devOnlyNonPublishable(project.files("libs/dragonfixes-2.6.0-dev.jar"))
 
-    // for ingame testing regarding chunk generation
-    runtimeOnlyNonPublishable(rfg.deobf("curse.maven:archaicfix-677782:8125364"))
+    // Mixin targets. These are the mods ChromaExtras patches; they are provided at runtime by the
+    // environment/modpack, so we only need them at compile time (not published, not bundled).
+    compileOnly(rfg.deobf("curse.maven:dragonapi-235591:4722480"))
+    compileOnly(rfg.deobf("curse.maven:chromaticraft-235590:4721192"))
 }

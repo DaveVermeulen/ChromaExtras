@@ -1,6 +1,7 @@
 .gradle
 .settings
 mod-sources
+src/main/resources/latest-test-run.log
 /.idea/
 /.vscode/
 /run/
