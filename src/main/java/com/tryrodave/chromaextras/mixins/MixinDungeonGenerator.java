@@ -14,6 +14,7 @@ import com.tryrodave.chromaextras.util.DeferredStructureGen;
 
 import Reika.ChromatiCraft.Registry.ChromaStructures;
 import Reika.ChromatiCraft.World.IWG.DungeonGenerator;
+import cpw.mods.fml.common.IWorldGenerator;
 
 /**
  * ChromatiCraft's grid structures (temples/dungeons) are placed by {@code checkChunk} during a chunk's population.
@@ -42,7 +43,8 @@ public class MixinDungeonGenerator {
         for (int dx = -CHROMAEXTRAS$FOOTPRINT_CHUNK_RADIUS; dx <= CHROMAEXTRAS$FOOTPRINT_CHUNK_RADIUS; dx++) {
             for (int dz = -CHROMAEXTRAS$FOOTPRINT_CHUNK_RADIUS; dz <= CHROMAEXTRAS$FOOTPRINT_CHUNK_RADIUS; dz++) {
                 if (!cp.chunkExists(chunkX + dx, chunkZ + dz)) {
-                    DeferredStructureGen.enqueue(world.provider.dimensionId, chunkX, chunkZ);
+                    DeferredStructureGen
+                        .enqueue(world.provider.dimensionId, chunkX, chunkZ, (IWorldGenerator) (Object) this);
                     cir.setReturnValue(false);
                     return;
                 }
