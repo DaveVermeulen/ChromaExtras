@@ -34,7 +34,6 @@
     ],
     "client": [
         "MixinChromaBookGui",
-        "MixinDEHudHandler",
         "MixinReikaRenderHelper",
         "MixinTessellator"
     ]

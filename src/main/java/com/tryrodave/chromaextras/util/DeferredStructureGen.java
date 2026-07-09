@@ -9,11 +9,14 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-import net.minecraft.server.MinecraftServer;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.IChunkProvider;
+import net.minecraftforge.common.DimensionManager;
 
 import Reika.ChromatiCraft.Base.ChromaWorldGenerator;
+import Reika.ChromatiCraft.World.Dimension.DimensionGenerators;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.IWorldGenerator;
 
@@ -88,17 +91,26 @@ public final class DeferredStructureGen {
     public static synchronized void enqueueFeature(int dimensionId, int blockX, int blockY, int blockZ, int blockReach,
         ChromaWorldGenerator generator) {
         PENDING_FEATURES.computeIfAbsent(dimensionId, k -> new ArrayList<>())
-            .add(new DeferredFeature(blockX, blockY, blockZ, blockReach, generator));
+            .add(new DeferredFeature(blockX, blockY, blockZ, blockReach, generator, generator.type.name()));
+    }
+
+    private static synchronized void requeueFeature(int dimensionId, DeferredFeature feature) {
+        PENDING_FEATURES.computeIfAbsent(dimensionId, k -> new ArrayList<>())
+            .add(feature);
+    }
+
+    /**
+     * Drop everything queued. Called when the server stops: the queues were just persisted by the world save (see
+     * {@link DeferredGenSavedData}), and clearing prevents a different world opened later in the same game session
+     * from inheriting - and generating - this world's deferred structures.
+     */
+    public static synchronized void clearAll() {
+        PENDING.clear();
+        PENDING_FEATURES.clear();
     }
 
     /** Called every server tick; generates any deferred cell whose footprint is now fully loaded. */
     public static void tick() {
-        MinecraftServer server = FMLCommonHandler.instance()
-            .getMinecraftServerInstance();
-        if (server == null) {
-            return;
-        }
-
         // Phase 1: under the lock, gather generators for cells that are ready and remove those cells from the queue.
         // No generation here, so nothing can re-enter and mutate the queue while we iterate.
         List<Ready> ready = new ArrayList<>();
@@ -112,9 +124,11 @@ public final class DeferredStructureGen {
                 .iterator();
             while (dims.hasNext() && structureBudget > 0) {
                 Map.Entry<Integer, Map<Long, Set<IWorldGenerator>>> dimEntry = dims.next();
-                WorldServer world = server.worldServerForDimension(dimEntry.getKey());
+                // DimensionManager.getWorld, NOT server.worldServerForDimension: the latter force-initializes an
+                // unloaded dimension, which would pin e.g. Proxima loaded forever while its queue is non-empty.
+                WorldServer world = DimensionManager.getWorld(dimEntry.getKey());
                 if (world == null) {
-                    continue;
+                    continue; // dimension unloaded; its entries just wait until the player returns
                 }
                 IChunkProvider cp = world.getChunkProvider();
                 Iterator<Map.Entry<Long, Set<IWorldGenerator>>> cells = dimEntry.getValue()
@@ -144,9 +158,9 @@ public final class DeferredStructureGen {
                 .iterator();
             while (fdims.hasNext() && featureBudget > 0) {
                 Map.Entry<Integer, List<DeferredFeature>> dimEntry = fdims.next();
-                WorldServer world = server.worldServerForDimension(dimEntry.getKey());
+                WorldServer world = DimensionManager.getWorld(dimEntry.getKey());
                 if (world == null) {
-                    continue;
+                    continue; // dimension unloaded; never force-initialize it just to check the queue
                 }
                 IChunkProvider cp = world.getChunkProvider();
                 Iterator<DeferredFeature> it = dimEntry.getValue()
@@ -169,8 +183,10 @@ public final class DeferredStructureGen {
         // Phase 2: generate outside the lock/iteration. A re-entrant enqueue() (nested populate) is now safe, and a
         // per-cell try/catch keeps one failed structure from taking down the server tick.
         for (Ready r : ready) {
-            WorldServer world = server.worldServerForDimension(r.dimensionId);
+            WorldServer world = DimensionManager.getWorld(r.dimensionId);
             if (world == null) {
+                // dimension vanished between the phases; put the cell back rather than dropping the structure
+                enqueue(r.dimensionId, r.cellX, r.cellZ, r.generator);
                 continue;
             }
             IChunkProvider cp = world.getChunkProvider();
@@ -200,19 +216,107 @@ public final class DeferredStructureGen {
         // through to the real generation. No WorldGenInterceptionRegistry window here - the Chroma dimension does not
         // use one for its decorators (runDecorators just calls generate directly), so we match that.
         for (ReadyFeature rf : readyFeatures) {
-            WorldServer world = server.worldServerForDimension(rf.dimensionId);
+            WorldServer world = DimensionManager.getWorld(rf.dimensionId);
             if (world == null) {
+                // dimension vanished between the phases; put the feature back rather than dropping it
+                requeueFeature(rf.dimensionId, rf.feature);
                 continue;
             }
             DeferredFeature f = rf.feature;
             Random rng = new Random(world.getSeed() ^ ((long) f.x * 341873128712L) ^ ((long) f.z * 132897987541L));
             try {
-                f.generator.generate(world, rng, f.x, f.y, f.z);
+                // A feature restored from the world save carries only its DimensionGenerators name; resolve it to the
+                // live generator instance now. The dimension is loaded (its chunks exist), so ChunkProviderChroma has
+                // already built its decorator list and getGenerator() returns the cached, CC-created instance.
+                ChromaWorldGenerator gen = f.generator != null ? f.generator
+                    : DimensionGenerators.valueOf(f.typeName)
+                        .getGenerator(new Random(world.getSeed()), world.getSeed());
+                gen.generate(world, rng, f.x, f.y, f.z);
             } catch (Throwable t) {
                 FMLCommonHandler.instance()
                     .getFMLLogger()
                     .error("ChromaExtras: deferred feature generation failed at " + f.x + ", " + f.y + ", " + f.z, t);
             }
+        }
+    }
+
+    /**
+     * Snapshot the live queues into the world save (via {@link DeferredGenSavedData}). Without this, everything still
+     * queued at shutdown - the frontier ring around wherever the player logged out - was lost permanently: those
+     * chunks are already generated, so populate never fires for them again and the deferred dungeons/pylons/features
+     * would never be retried.
+     */
+    public static synchronized void writeToNBT(NBTTagCompound tag) {
+        NBTTagList structures = new NBTTagList();
+        for (Map.Entry<Integer, Map<Long, Set<IWorldGenerator>>> dimEntry : PENDING.entrySet()) {
+            for (Map.Entry<Long, Set<IWorldGenerator>> cellEntry : dimEntry.getValue()
+                .entrySet()) {
+                for (IWorldGenerator gen : cellEntry.getValue()) {
+                    NBTTagCompound e = new NBTTagCompound();
+                    e.setInteger("dim", dimEntry.getKey());
+                    e.setInteger("cx", unpackX(cellEntry.getKey()));
+                    e.setInteger("cz", unpackZ(cellEntry.getKey()));
+                    // All deferred structure generators are singletons (public static final X instance), so the class
+                    // name is a complete, stable identity to restore from.
+                    e.setString(
+                        "cls",
+                        gen.getClass()
+                            .getName());
+                    structures.appendTag(e);
+                }
+            }
+        }
+        tag.setTag("structures", structures);
+
+        NBTTagList features = new NBTTagList();
+        for (Map.Entry<Integer, List<DeferredFeature>> dimEntry : PENDING_FEATURES.entrySet()) {
+            for (DeferredFeature f : dimEntry.getValue()) {
+                NBTTagCompound e = new NBTTagCompound();
+                e.setInteger("dim", dimEntry.getKey());
+                e.setInteger("x", f.x);
+                e.setInteger("y", f.y);
+                e.setInteger("z", f.z);
+                e.setInteger("reach", f.reach);
+                e.setString("type", f.typeName);
+                features.appendTag(e);
+            }
+        }
+        tag.setTag("features", features);
+    }
+
+    /** Restore the queues from the world save. Runs once at server start, before any ticks. */
+    public static synchronized void readFromNBT(NBTTagCompound tag) {
+        clearAll();
+
+        NBTTagList structures = tag.getTagList("structures", 10 /* compound */);
+        for (int i = 0; i < structures.tagCount(); i++) {
+            NBTTagCompound e = structures.getCompoundTagAt(i);
+            String cls = e.getString("cls");
+            try {
+                IWorldGenerator gen = (IWorldGenerator) Class.forName(cls)
+                    .getField("instance")
+                    .get(null);
+                enqueue(e.getInteger("dim"), e.getInteger("cx"), e.getInteger("cz"), gen);
+            } catch (Exception ex) {
+                FMLCommonHandler.instance()
+                    .getFMLLogger()
+                    .warn("ChromaExtras: dropping saved deferred structure - cannot resolve generator " + cls, ex);
+            }
+        }
+
+        NBTTagList features = tag.getTagList("features", 10 /* compound */);
+        for (int i = 0; i < features.tagCount(); i++) {
+            NBTTagCompound e = features.getCompoundTagAt(i);
+            // Generator instance is resolved lazily at generation time (the dimension isn't loaded yet here).
+            requeueFeature(
+                e.getInteger("dim"),
+                new DeferredFeature(
+                    e.getInteger("x"),
+                    e.getInteger("y"),
+                    e.getInteger("z"),
+                    e.getInteger("reach"),
+                    null,
+                    e.getString("type")));
         }
     }
 
@@ -272,14 +376,18 @@ public final class DeferredStructureGen {
         private final int y;
         private final int z;
         private final int reach;
+        /** Null when restored from the world save; resolved lazily from {@link #typeName} at generation time. */
         private final ChromaWorldGenerator generator;
+        /** The generator's {@code DimensionGenerators} enum name - the persistent identity written to NBT. */
+        private final String typeName;
 
-        private DeferredFeature(int x, int y, int z, int reach, ChromaWorldGenerator generator) {
+        private DeferredFeature(int x, int y, int z, int reach, ChromaWorldGenerator generator, String typeName) {
             this.x = x;
             this.y = y;
             this.z = z;
             this.reach = reach;
             this.generator = generator;
+            this.typeName = typeName;
         }
     }
 

@@ -33,6 +33,17 @@ public final class EndIslandDeferral {
         return true;
     }
 
+    /**
+     * Drop the whole buffer. Called when the server stops, so a different world opened later in the same game session
+     * cannot receive this world's island blocks. Nothing is lost for the world that was just closed: ChromatiCraft
+     * resets {@code EndOverhaulManager} on the same event ({@code ChromatiCraft.singlePlayerLogout} ->
+     * {@code clearCaches()}), so the next load recomputes the layout from the seed and re-records every not-yet-placed
+     * block here.
+     */
+    public static void clear() {
+        BUFFER.clear();
+    }
+
     /** Place and clear any buffered island blocks in the given chunk, without triggering neighbor updates (flag 2). */
     public static void placeChunk(World world, int chunkX, int chunkZ) {
         Map<Coordinate, BlockKey> map = BUFFER.remove(ChunkCoordIntPair.chunkXZ2Int(chunkX, chunkZ));
