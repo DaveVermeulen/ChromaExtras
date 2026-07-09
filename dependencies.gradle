@@ -41,8 +41,8 @@ dependencies {
     compileOnly(rfg.deobf("curse.maven:dragonapi-235591:4722480"))
     compileOnly(rfg.deobf("curse.maven:chromaticraft-235590:4721192"))
 
-    // GTNH AE2 rv3 - only needed at compile time so the mixin annotation processor can resolve the
-    // appeng.services.export.ExportProcess target. Provided at runtime by the modpack. This is a deobfuscated
-    // "-dev" jar (already MCP-named), so it is referenced directly without rfg.deobf.
-    compileOnly(files("libs/appliedenergistics2-rv3-beta-1002-GTNH-dev.jar"))
+    // AE2 - needed at compile time only so the Mixin AP can resolve MixinAE2ExportProcess's string target
+    // (appeng.services.export.ExportProcess). Fetched from the GTNH maven rather than a local libs/ jar: libs/ is
+    // gitignored, so a local jar is absent on a fresh CI checkout and RFG's deobf transform hard-fails on it.
+    compileOnly("com.github.GTNewHorizons:Applied-Energistics-2-Unofficial:rv3-beta-1002-GTNH:dev")
 }
