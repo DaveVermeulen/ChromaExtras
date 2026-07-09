@@ -13,6 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import com.tryrodave.chromaextras.util.DeferredStructureGen;
 
 import Reika.ChromatiCraft.Base.ChromaWorldGenerator;
+import Reika.ChromatiCraft.World.Dimension.Generators.WorldGenCrystalPit;
 import Reika.ChromatiCraft.World.Dimension.Generators.WorldGenFissure;
 import Reika.ChromatiCraft.World.Dimension.Generators.WorldGenFloatstone;
 import Reika.ChromatiCraft.World.Dimension.Generators.WorldGenGlowCave;
@@ -20,9 +21,10 @@ import Reika.ChromatiCraft.World.Dimension.Generators.WorldGenGlowCave;
 /**
  * The rare, highly visible ChromatiCraft-dimension (Proxima) features that reach across chunks: floating stone
  * islands ({@link WorldGenFloatstone}, the "stuff in the sky"), glow caves ({@link WorldGenGlowCave}, which wander
- * tens of blocks as they carve downward), and fissures ({@link WorldGenFissure}). Each is a {@code WorldGenerator}
- * whose {@code generate} reads/writes a region around its origin; run during population, that force-loads neighbor
- * chunks (cascading worldgen lag).
+ * tens of blocks as they carve downward), fissures ({@link WorldGenFissure}), and crystal-pit geodes
+ * ({@link WorldGenCrystalPit}, a ~8-block-radius hollowed ellipsoid). Each is a {@code WorldGenerator} whose
+ * {@code generate} reads/writes a region around its origin; run during population, that force-loads neighbor chunks
+ * (cascading worldgen lag).
  *
  * <p>
  * An earlier version simply skipped these when their footprint was not loaded. That worked for the dense tree
@@ -33,10 +35,12 @@ import Reika.ChromatiCraft.World.Dimension.Generators.WorldGenGlowCave;
  * few chunks behind the frontier. (The dense tree cluster keeps its own finer per-tree skip guard.)
  *
  * <p>
- * All three share the inherited {@code generate(World, Random, int, int, int)} signature, so one multi-target guard
+ * They all share the inherited {@code generate(World, Random, int, int, int)} signature, so one multi-target guard
  * covers them.
  */
-@Mixin(value = { WorldGenGlowCave.class, WorldGenFloatstone.class, WorldGenFissure.class }, remap = false)
+@Mixin(
+    value = { WorldGenGlowCave.class, WorldGenFloatstone.class, WorldGenFissure.class, WorldGenCrystalPit.class },
+    remap = false)
 public class MixinChromaDimensionFeatures {
 
     /**

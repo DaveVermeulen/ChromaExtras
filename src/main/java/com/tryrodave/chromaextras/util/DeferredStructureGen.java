@@ -13,10 +13,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.chunk.IChunkProvider;
 
-import com.tryrodave.chromaextras.mixins.AccessorWorldGenInterceptionRegistry;
-
 import Reika.ChromatiCraft.Base.ChromaWorldGenerator;
-import Reika.DragonAPI.Auxiliary.WorldGenInterceptionRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.IWorldGenerator;
 
@@ -179,12 +176,14 @@ public final class DeferredStructureGen {
             IChunkProvider cp = world.getChunkProvider();
             Random rng = new Random(
                 world.getSeed() ^ ((long) r.cellX * 341873128712L) ^ ((long) r.cellZ * 132897987541L));
-            // Open DragonAPI's worldgen-decoration window so the block changes this structure makes are recorded,
-            // then run postPopulation so ChromatiCraft's post-gen tuning (dungeon spawner rates, Thaumcraft nodes,
-            // ...) is applied just as it would be during a normal populate. The footprint is loaded, so this reads
-            // no unloaded chunks. postPopulation decrements the counter, balancing the increment below.
-            AccessorWorldGenInterceptionRegistry accessor = (AccessorWorldGenInterceptionRegistry) (Object) WorldGenInterceptionRegistry.instance;
-            accessor.chromaextras$setRunningChunkDecoration(accessor.chromaextras$getRunningChunkDecoration() + 1);
+            // Generate the structure's blocks directly. Earlier this opened DragonAPI's worldgen-decoration window
+            // (bumping runningChunkDecoration) and called WorldGenInterceptionRegistry.postPopulation afterwards, to
+            // record the block changes and run ChromatiCraft's post-gen tuning. That was unsafe: postPopulation
+            // copies DragonAPI's shared block-set map with new HashMap(data), and calling it out-of-band from the
+            // server tick raced that map against concurrent worldgen recording, throwing
+            // ConcurrentModificationException
+            // and crashing the server. The footprint is loaded so the structure places fine without any of that; the
+            // only thing lost is cosmetic post-gen tuning (e.g. rainbow-forest spawner rates), which is acceptable.
             try {
                 r.generator.generate(rng, r.cellX, r.cellZ, world, cp, cp);
             } catch (Throwable t) {
@@ -193,8 +192,6 @@ public final class DeferredStructureGen {
                     .error(
                         "ChromaExtras: deferred structure generation failed at chunk " + r.cellX + ", " + r.cellZ,
                         t);
-            } finally {
-                WorldGenInterceptionRegistry.instance.postPopulation(world, r.cellX, r.cellZ);
             }
         }
 
