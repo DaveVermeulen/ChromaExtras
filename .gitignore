@@ -2,7 +2,7 @@
 .settings
 mod-sources
 libs
-src/main/resources/latest-test-run.log
+/latest-test-run.log
 /.idea/
 /.vscode/
 /run/
