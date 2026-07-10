@@ -29,6 +29,7 @@
         "MixinStructuredBlockArray",
         "MixinTieredWorldGenerator",
         "MixinTreeShaper",
+        "MixinWorldGenHiveWater",
         "MixinWorldGenTreeCluster",
         "MixinWorldGenTreeClusterShape"
     ],

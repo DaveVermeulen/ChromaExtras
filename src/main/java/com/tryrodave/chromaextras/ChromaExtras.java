@@ -1,25 +1,48 @@
 package com.tryrodave.chromaextras;
 
+import net.minecraft.creativetab.CreativeTabs;
+import net.minecraft.item.ItemArmor.ArmorMaterial;
 import net.minecraft.world.WorldServer;
 import net.minecraft.world.storage.MapStorage;
 import net.minecraftforge.common.DimensionManager;
+import net.minecraftforge.common.util.EnumHelper;
 
+import com.tryrodave.chromaextras.client.HiveVisionHandler;
+import com.tryrodave.chromaextras.items.ItemHiveGoggles;
 import com.tryrodave.chromaextras.util.DeferredGenSavedData;
 import com.tryrodave.chromaextras.util.DeferredStructureGen;
 import com.tryrodave.chromaextras.util.EndIslandDeferral;
+import com.tryrodave.chromaextras.util.MissingPackTextureSilencer;
 
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
+import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartedEvent;
 import cpw.mods.fml.common.event.FMLServerStoppedEvent;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
+import cpw.mods.fml.common.registry.GameRegistry;
 
 @Mod(modid = ChromaExtras.MODID, version = Tags.VERSION, name = "ChromaExtras", acceptedMinecraftVersions = "[1.7.10]")
 public class ChromaExtras {
 
     public static final String MODID = "chromaextras";
+
+    /** Argia's Apiary Goggles - reveal nearby hives through walls, powered by ChromatiCraft energy. */
+    public static ItemHiveGoggles hiveGoggles;
+
+    @Mod.EventHandler
+    public void preInit(FMLPreInitializationEvent event) {
+        // Unbreakable utility helmet (item damage is unused - charge lives in NBT), so durability/reduction values are
+        // nominal. armorType 0 = helmet.
+        ArmorMaterial material = EnumHelper
+            .addArmorMaterial("chromaextras_hivegoggles", 15, new int[] { 2, 0, 0, 0 }, 10);
+        hiveGoggles = new ItemHiveGoggles(material);
+        hiveGoggles.setUnlocalizedName("chromaextras.hive_goggles");
+        hiveGoggles.setCreativeTab(CreativeTabs.tabTools);
+        GameRegistry.registerItem(hiveGoggles, "hive_goggles");
+    }
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
@@ -27,6 +50,18 @@ public class ChromaExtras {
         FMLCommonHandler.instance()
             .bus()
             .register(this);
+
+        // Client-only: stop DragonAPI printing an InvocationTargetException every time an active resource pack lacks
+        // a ChromatiCraft TESR texture it probes (see MissingPackTextureSilencer); and drive the goggles' hive-vision
+        // particles. ClientTickEvent is an FML-bus event, so the handler goes on the FML bus, not the Forge one.
+        if (FMLCommonHandler.instance()
+            .getSide()
+            .isClient()) {
+            MissingPackTextureSilencer.register();
+            FMLCommonHandler.instance()
+                .bus()
+                .register(new HiveVisionHandler());
+        }
     }
 
     /**

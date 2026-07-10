@@ -45,4 +45,9 @@ dependencies {
     // (appeng.services.export.ExportProcess). Fetched from the GTNH maven rather than a local libs/ jar: libs/ is
     // gitignored, so a local jar is absent on a fresh CI checkout and RFG's deobf transform hard-fails on it.
     compileOnly("com.github.GTNewHorizons:Applied-Energistics-2-Unofficial:rv3-beta-1002-GTNH:dev")
+
+    // Binnie (Extra Bees) - compile-time only, so the Mixin AP can resolve MixinWorldGenHiveWater's target
+    // (binnie.extrabees.worldgen.WorldGenHiveWater). Provided at runtime by the modpack. GTNH publishes a
+    // deobfuscated ":dev" jar, so no rfg.deobf is needed.
+    compileOnly("com.github.GTNewHorizons:Binnie:2.6.34:dev")
 }
