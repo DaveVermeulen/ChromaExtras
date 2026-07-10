@@ -54,7 +54,10 @@ public class HiveVisionHandler {
     private static final Map<Block, Boolean> HIVE_CACHE = new HashMap<>();
     private static final Random rand = new Random();
 
-    /** Cached hive positions (x, y, z triples) from the last scan. */
+    /** Sentinel colour for ChromatiCraft's crystal hive: cycle through the rainbow instead of one fixed colour. */
+    private static final int RAINBOW = -1;
+
+    /** Cached hive markers (x, y, z, colour quadruples) from the last scan. */
     private final List<int[]> hives = new ArrayList<>();
     private int ticksSinceScan = SCAN_INTERVAL_TICKS; // scan immediately on first powered tick
 
@@ -86,7 +89,7 @@ public class HiveVisionHandler {
 
         if (!hives.isEmpty() && world.getTotalWorldTime() % FX_INTERVAL_TICKS == 0) {
             for (int[] pos : hives) {
-                this.spawnHiveFX(world, pos[0], pos[1], pos[2]);
+                this.spawnHiveFX(world, pos[0], pos[1], pos[2], pos[3]);
             }
         }
     }
@@ -104,8 +107,9 @@ public class HiveVisionHandler {
                     continue; // chunk not loaded on the client; never force it
                 }
                 for (int y = yMin; y <= yMax; y++) {
-                    if (isHive(world.getBlock(x, y, z))) {
-                        hives.add(new int[] { x, y, z });
+                    Block b = world.getBlock(x, y, z);
+                    if (isHive(b)) {
+                        hives.add(new int[] { x, y, z, getHiveColor(b, world.getBlockMetadata(x, y, z)) });
                     }
                 }
             }
@@ -132,10 +136,77 @@ public class HiveVisionHandler {
     }
 
     /**
-     * The Unknown-Artefact reveal, recoloured to Argia: an occasional large soft halo plus frequent small white
-     * sparkles, all with the depth test off so they glow through the terrain between you and the hive.
+     * Colour for a hive's markers, keyed off the hive block + metadata so each hive type reads at a glance.
+     *
+     * <ul>
+     * <li>Forestry {@code beehives} metas (HiveDescription): 1 FOREST amber, 2 MEADOWS bright yellow, 3 DESERT pale
+     * sand, 4 JUNGLE green, 5 END purple, 6 SNOW icy blue, 7 SWAMP murky olive.</li>
+     * <li>Extra Bees {@code hive} metas: 0 WATER blue, 1 ROCK gray, 2 NETHER crimson, 3 MARBLE white.</li>
+     * <li>ChromatiCraft crystal hive metas: 0 crystal - {@link #RAINBOW rainbow-cycling}, of course - and 1 pure,
+     * white.</li>
+     * <li>Anything else that calls itself a hive: Argia light-gray, the goggles' own colour.</li>
+     * </ul>
      */
-    private void spawnHiveFX(World world, int x, int y, int z) {
+    private static int getHiveColor(Block b, int meta) {
+        UniqueIdentifier uid = GameRegistry.findUniqueIdentifierFor(b);
+        if (uid == null) {
+            return CrystalElement.LIGHTGRAY.getColor();
+        }
+        String mod = uid.modId.toLowerCase(Locale.ROOT);
+        if (mod.equals("forestry")) {
+            switch (meta) {
+                case 1:
+                    return 0xE28C25; // FOREST
+                case 2:
+                    return 0xFFE649; // MEADOWS
+                case 3:
+                    return 0xE8DCA4; // DESERT (Modest)
+                case 4:
+                    return 0x36BE49; // JUNGLE (Tropical)
+                case 5:
+                    return 0xB666E8; // END (Ended)
+                case 6:
+                    return 0xA8E1F0; // SNOW (Wintry)
+                case 7:
+                    return 0x6B7D2A; // SWAMP (Marshy)
+                default:
+                    return 0xE0B040;
+            }
+        }
+        if (mod.equals("extrabees")) {
+            switch (meta) {
+                case 0:
+                    return 0x3B7BE8; // WATER
+                case 1:
+                    return 0x8F8F8F; // ROCK
+                case 2:
+                    return 0xE83B3B; // NETHER
+                case 3:
+                    return 0xF0F0E8; // MARBLE
+                default:
+                    return 0x3B7BE8;
+            }
+        }
+        if (mod.equals("chromaticraft")) {
+            return meta == 0 ? RAINBOW : 0xFFFFFF; // 0 crystal hive, 1 pure hive
+        }
+        return CrystalElement.LIGHTGRAY.getColor();
+    }
+
+    /** The current colour of a rainbow-cycling marker: a full hue sweep every ~8 seconds. */
+    private static int rainbowColor(World world) {
+        float hue = (world.getTotalWorldTime() % 160) / 160F;
+        return java.awt.Color.HSBtoRGB(hue, 0.7F, 1F) & 0xFFFFFF;
+    }
+
+    /**
+     * The Unknown-Artefact reveal in the hive's colour: an occasional large soft halo plus frequent small sparkles,
+     * all with the depth test off so they glow through the terrain between you and the hive.
+     */
+    private void spawnHiveFX(World world, int x, int y, int z, int color) {
+        if (color == RAINBOW) {
+            color = rainbowColor(world);
+        }
         double cx = x + 0.5;
         double cy = y + 0.5;
         double cz = z + 0.5;
@@ -146,7 +217,8 @@ public class HiveVisionHandler {
             double pz = ReikaRandomHelper.getRandomPlusMinus(cz, 0.75);
             int l = ReikaRandomHelper.getRandomBetween(20, 45);
             float s = (float) (4 + rand.nextDouble() * 4);
-            int c = ReikaColorAPI.mixColors(CrystalElement.LIGHTGRAY.getColor(), 0xffffff, 0.7F);
+            // lighten only slightly so the hive colour stays readable in the big halo
+            int c = ReikaColorAPI.mixColors(color, 0xffffff, 0.75F);
             EntityCCBlurFX fx = new EntityCCBlurFX(world, px, py, pz);
             fx.setIcon(ChromaIcons.FADE_CLOUD)
                 .setColor(c)
@@ -167,9 +239,11 @@ public class HiveVisionHandler {
             double vx = ReikaRandomHelper.getRandomPlusMinus(0, maxv);
             double vy = ReikaRandomHelper.getRandomPlusMinus(0, maxv);
             double vz = ReikaRandomHelper.getRandomPlusMinus(0, maxv);
+            // sparkles carry the hive colour half-mixed toward white: bright, but still tinted
+            int c = ReikaColorAPI.mixColors(color, 0xffffff, 0.5F);
             EntityCCBlurFX fx = new EntityCCBlurFX(world, px, py, pz, vx, vy, vz);
             fx.setIcon(ChromaIcons.FADE_STAR)
-                .setColor(0xffffff)
+                .setColor(c)
                 .setLife(l)
                 .setRapidExpand()
                 .setNoDepthTest();
