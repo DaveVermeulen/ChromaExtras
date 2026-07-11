@@ -92,11 +92,9 @@ public class BlockVoidVault extends BlockContainer {
         TileEntity te = world.getTileEntity(x, y, z);
         if (te instanceof TileEntityVoidVault) {
             TileEntityVoidVault vault = (TileEntityVoidVault) te;
-            for (int i = 0; i < vault.getSizeInventory(); i++) {
-                ItemStack in = vault.getStackInSlot(i);
-                if (in != null) {
-                    world.spawnEntityInWorld(new EntityItem(world, x + 0.5, y + 0.5, z + 0.5, in));
-                }
+            // spill the accessible inventory AND the pending limbo buffer - breaking the vault must never lose items
+            for (ItemStack in : vault.getAllContentsForDrop()) {
+                world.spawnEntityInWorld(new EntityItem(world, x + 0.5, y + 0.5, z + 0.5, in));
             }
             if (!world.isRemote && vault.getOwnerId() != null) {
                 VoidVaultRegistry.get()

@@ -33,9 +33,17 @@ public class WailaVoidVault implements IWailaDataProvider {
     @Override
     public List<String> getWailaBody(ItemStack itemStack, List<String> tooltip, IWailaDataAccessor accessor,
         IWailaConfigHandler config) {
-        String owner = accessor.getNBTData() != null ? accessor.getNBTData()
-            .getString("OwnerName") : "";
+        NBTTagCompound data = accessor.getNBTData();
+        String owner = data != null ? data.getString("OwnerName") : "";
         tooltip.add(owner == null || owner.isEmpty() ? "Unbound" : "Bound to: " + owner);
+        if (data != null && data.hasKey("VaultEnergy")) {
+            tooltip.add(
+                String
+                    .format("Energy: %,d / %,d RF", data.getInteger("VaultEnergy"), data.getInteger("VaultCapacity")));
+        }
+        if (data != null && data.getInteger("VaultPending") > 0) {
+            tooltip.add(data.getInteger("VaultPending") + " item(s) awaiting recovery");
+        }
         return tooltip;
     }
 
@@ -43,7 +51,11 @@ public class WailaVoidVault implements IWailaDataProvider {
     public NBTTagCompound getNBTData(EntityPlayerMP player, TileEntity te, NBTTagCompound tag, World world, int x,
         int y, int z) {
         if (te instanceof TileEntityVoidVault) {
-            tag.setString("OwnerName", ((TileEntityVoidVault) te).getOwnerName());
+            TileEntityVoidVault vault = (TileEntityVoidVault) te;
+            tag.setString("OwnerName", vault.getOwnerName());
+            tag.setInteger("VaultEnergy", vault.getEnergy());
+            tag.setInteger("VaultCapacity", vault.getCapacity());
+            tag.setInteger("VaultPending", vault.getPendingItemCount());
         }
         return tag;
     }

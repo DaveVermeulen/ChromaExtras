@@ -16,6 +16,7 @@ import com.tryrodave.chromaextras.ChromaExtras;
 import Reika.ChromatiCraft.API.ChromatiAPI;
 import Reika.ChromatiCraft.API.CrystalElementAccessor;
 import Reika.ChromatiCraft.API.CrystalElementAccessor.CrystalElementProxy;
+import Reika.ChromatiCraft.Auxiliary.ChromaStacks;
 import Reika.ChromatiCraft.Registry.ChromaItems;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.registry.GameRegistry;
@@ -89,5 +90,90 @@ public final class ChromaCastingRecipes {
         ChromatiAPI.getAPI()
             .recipes()
             .addTempleCastingRecipe(recipe, runes);
+
+        registerVaultRecipes();
+    }
+
+    /**
+     * The two vault recipes, both made in the ChromatiCraft casting room (item stands around the table).
+     *
+     * <p>
+     * <b>Void Vault</b> - MultiBlock tier (5x5 stands, no pylon energy): an Ender Chest at the centre, a Nether Star
+     * as its base, ringed by 3 Draconium Ingots and Spatial Rifting Powder ({@code ChromaStacks.spaceDust}).
+     *
+     * <p>
+     * <b>Death Vault</b> - Pylon tier (the upgrade, so it also demands crystal energy): the Void Vault itself at the
+     * centre, the 3 Draconium Ingots promoted to Awakened Draconium, plus Wither Skeleton skulls and more Spatial
+     * Rifting Powder for the "any death" theme, and a charge of Black + Light Blue lumen energy.
+     */
+    private static void registerVaultRecipes() {
+        ItemStack draconium = firstOre("ingotDraconium");
+        ItemStack awakened = firstOre("ingotDraconiumAwakened");
+        ItemStack spaceDust = ChromaStacks.spaceDust.copy();
+        ItemStack netherStar = new ItemStack(Items.nether_star);
+        ItemStack witherSkull = new ItemStack(Items.skull, 1, 1);
+
+        // --- Void Vault: MultiBlock tier ---
+        Map<List<Integer>, ItemStack> voidItems = new HashMap<>();
+        voidItems.put(Arrays.asList(0, 2), netherStar.copy()); // the star, the vault's core, at the front
+        if (draconium != null) {
+            voidItems.put(Arrays.asList(-2, 0), draconium.copy());
+            voidItems.put(Arrays.asList(2, 0), draconium.copy());
+            voidItems.put(Arrays.asList(0, -2), draconium.copy());
+        }
+        voidItems.put(Arrays.asList(-2, 2), spaceDust.copy());
+        voidItems.put(Arrays.asList(2, 2), spaceDust.copy());
+
+        ChromatiAPI.getAPI()
+            .recipes()
+            .addMultiBlockCastingRecipe(
+                new ItemStack(ChromaExtras.voidVault),
+                new ItemStack(net.minecraft.init.Blocks.ender_chest),
+                null,
+                voidItems);
+
+        // --- Death Vault: Pylon tier (upgrade of the Void Vault) ---
+        Map<List<Integer>, ItemStack> deathItems = new HashMap<>();
+        deathItems.put(Arrays.asList(0, 2), netherStar.copy());
+        if (awakened != null) {
+            deathItems.put(Arrays.asList(-2, 0), awakened.copy());
+            deathItems.put(Arrays.asList(2, 0), awakened.copy());
+            deathItems.put(Arrays.asList(0, -2), awakened.copy());
+        }
+        deathItems.put(Arrays.asList(-2, -2), witherSkull.copy());
+        deathItems.put(Arrays.asList(2, -2), witherSkull.copy());
+        deathItems.put(Arrays.asList(-2, 2), spaceDust.copy());
+        deathItems.put(Arrays.asList(2, 2), spaceDust.copy());
+
+        Map<CrystalElementProxy, Integer> energy = new HashMap<>();
+        energy.put(CrystalElementAccessor.getByEnum("BLACK"), 60_000); // void
+        energy.put(CrystalElementAccessor.getByEnum("LIGHTBLUE"), 40_000); // rifting
+
+        ChromatiAPI.getAPI()
+            .recipes()
+            .addPylonCastingRecipe(
+                new ItemStack(ChromaExtras.deathVault),
+                new ItemStack(ChromaExtras.voidVault),
+                null,
+                deathItems,
+                energy);
+    }
+
+    /** First ore-dictionary stack for a name (size 1), or null if the mod providing it is absent. */
+    private static ItemStack firstOre(String name) {
+        java.util.List<ItemStack> ores = net.minecraftforge.oredict.OreDictionary.getOres(name);
+        if (ores.isEmpty()) {
+            FMLCommonHandler.instance()
+                .getFMLLogger()
+                .warn("ChromaExtras: ore '" + name + "' not found; vault recipe will omit it");
+            return null;
+        }
+        ItemStack copy = ores.get(0)
+            .copy();
+        copy.stackSize = 1;
+        if (copy.getItemDamage() == net.minecraftforge.oredict.OreDictionary.WILDCARD_VALUE) {
+            copy.setItemDamage(0);
+        }
+        return copy;
     }
 }

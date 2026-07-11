@@ -1,9 +1,12 @@
 package com.tryrodave.chromaextras.util;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.world.WorldSavedData;
@@ -45,6 +48,12 @@ public class VoidVaultRegistry extends WorldSavedData {
     }
 
     private final Map<UUID, VaultLocation> bindings = new HashMap<>();
+
+    /**
+     * Per-player limbo: death-caught items awaiting paid recovery. Lives here - in the world save, NOT in any tile -
+     * so items survive the vault being broken, exploded, or moved; a newly placed, powered vault resumes recovery.
+     */
+    private final Map<UUID, List<ItemStack>> pendingItems = new HashMap<>();
 
     /** MapStorage instantiates saved data reflectively through this (String) constructor. */
     public VoidVaultRegistry(String id) {
@@ -89,6 +98,53 @@ public class VoidVaultRegistry extends WorldSavedData {
         return bindings.get(player);
     }
 
+    // --- pending limbo -------------------------------------------------------------
+
+    /** Death capture: stashes a stack in the player's limbo. Always succeeds; recovery is paid for later. */
+    public void enqueuePending(UUID player, ItemStack stack) {
+        if (stack != null && stack.stackSize > 0) {
+            pendingItems.computeIfAbsent(player, k -> new ArrayList<>())
+                .add(stack.copy());
+            this.markDirty();
+        }
+    }
+
+    public int getPendingItemCount(UUID player) {
+        List<ItemStack> list = pendingItems.get(player);
+        if (list == null) {
+            return 0;
+        }
+        int n = 0;
+        for (ItemStack is : list) {
+            n += is.stackSize;
+        }
+        return n;
+    }
+
+    /** The next item type awaiting recovery, or null when the player's limbo is empty. Do not mutate. */
+    public ItemStack peekFirstPending(UUID player) {
+        List<ItemStack> list = pendingItems.get(player);
+        return list == null || list.isEmpty() ? null : list.get(0);
+    }
+
+    /** Removes and returns exactly one item from the player's limbo (null when empty). */
+    public ItemStack extractOnePending(UUID player) {
+        List<ItemStack> list = pendingItems.get(player);
+        if (list == null || list.isEmpty()) {
+            return null;
+        }
+        ItemStack first = list.get(0);
+        ItemStack one = first.splitStack(1);
+        if (first.stackSize <= 0) {
+            list.remove(0);
+            if (list.isEmpty()) {
+                pendingItems.remove(player);
+            }
+        }
+        this.markDirty();
+        return one;
+    }
+
     // --- persistence ------------------------------------------------------------
 
     @Override
@@ -106,6 +162,23 @@ public class VoidVaultRegistry extends WorldSavedData {
                     e.getInteger("y"),
                     e.getInteger("z"),
                     e.getInteger("type"))); // absent (pre-Death-Vault saves) = 0 = TYPE_VOID
+        }
+        pendingItems.clear();
+        NBTTagList plist = tag.getTagList("pending", 10 /* compound */);
+        for (int i = 0; i < plist.tagCount(); i++) {
+            NBTTagCompound e = plist.getCompoundTagAt(i);
+            UUID player = new UUID(e.getLong("idMost"), e.getLong("idLeast"));
+            List<ItemStack> items = new ArrayList<>();
+            NBTTagList ilist = e.getTagList("items", 10);
+            for (int j = 0; j < ilist.tagCount(); j++) {
+                ItemStack is = ItemStack.loadItemStackFromNBT(ilist.getCompoundTagAt(j));
+                if (is != null) {
+                    items.add(is);
+                }
+            }
+            if (!items.isEmpty()) {
+                pendingItems.put(player, items);
+            }
         }
     }
 
@@ -131,5 +204,27 @@ public class VoidVaultRegistry extends WorldSavedData {
             list.appendTag(e);
         }
         tag.setTag("vaults", list);
+
+        NBTTagList plist = new NBTTagList();
+        for (Map.Entry<UUID, List<ItemStack>> entry : pendingItems.entrySet()) {
+            NBTTagCompound e = new NBTTagCompound();
+            e.setLong(
+                "idMost",
+                entry.getKey()
+                    .getMostSignificantBits());
+            e.setLong(
+                "idLeast",
+                entry.getKey()
+                    .getLeastSignificantBits());
+            NBTTagList ilist = new NBTTagList();
+            for (ItemStack is : entry.getValue()) {
+                NBTTagCompound it = new NBTTagCompound();
+                is.writeToNBT(it);
+                ilist.appendTag(it);
+            }
+            e.setTag("items", ilist);
+            plist.appendTag(e);
+        }
+        tag.setTag("pending", plist);
     }
 }

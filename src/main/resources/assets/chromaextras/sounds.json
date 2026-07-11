@@ -1,0 +1,18 @@
+{
+    "vault.open": {
+        "category": "block",
+        "sounds": ["vault/vault_open"]
+    },
+    "vault.close": {
+        "category": "block",
+        "sounds": ["vault/vault_close"]
+    },
+    "vault.insert": {
+        "category": "block",
+        "sounds": ["vault/vault_insert_0", "vault/vault_insert_1", "vault/vault_insert_2", "vault/vault_insert_3"]
+    },
+    "vault.insert_final": {
+        "category": "block",
+        "sounds": ["vault/vault_insert_final"]
+    }
+}
