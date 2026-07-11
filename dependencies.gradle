@@ -50,4 +50,8 @@ dependencies {
     // (binnie.extrabees.worldgen.WorldGenHiveWater). Provided at runtime by the modpack. GTNH publishes a
     // deobfuscated ":dev" jar, so no rfg.deobf is needed.
     compileOnly("com.github.GTNewHorizons:Binnie:2.6.34:dev")
+
+    // GTNH Draconic Evolution - compile-time only, for the late mixin adding the "Apiarist Vision" helmet toggle
+    // (MixinDraconicArmorFields targets DraconicArmor.getFields). Provided at runtime by the modpack.
+    compileOnly("com.github.GTNewHorizons:Draconic-Evolution:1.5.28-GTNH:dev")
 }

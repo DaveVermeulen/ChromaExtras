@@ -8,6 +8,8 @@ import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.common.util.EnumHelper;
 
 import com.tryrodave.chromaextras.client.HiveVisionHandler;
+import com.tryrodave.chromaextras.command.CommandTeleportPlus;
+import com.tryrodave.chromaextras.compat.ChromaCastingRecipes;
 import com.tryrodave.chromaextras.items.ItemHiveGoggles;
 import com.tryrodave.chromaextras.util.DeferredGenSavedData;
 import com.tryrodave.chromaextras.util.DeferredStructureGen;
@@ -17,8 +19,10 @@ import com.tryrodave.chromaextras.util.MissingPackTextureSilencer;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
+import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartedEvent;
+import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.event.FMLServerStoppedEvent;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
@@ -62,6 +66,18 @@ public class ChromaExtras {
                 .bus()
                 .register(new HiveVisionHandler());
         }
+    }
+
+    /** Casting recipes must be registered in postInit (per ChromatiCraft's CastingAPI contract). */
+    @Mod.EventHandler
+    public void postInit(FMLPostInitializationEvent event) {
+        ChromaCastingRecipes.register();
+    }
+
+    /** /tpp - modern-style teleport with yaw/pitch, for lining up panorama camera shots. OP level 2 like /tp. */
+    @Mod.EventHandler
+    public void serverStarting(FMLServerStartingEvent event) {
+        event.registerServerCommand(new CommandTeleportPlus());
     }
 
     /**

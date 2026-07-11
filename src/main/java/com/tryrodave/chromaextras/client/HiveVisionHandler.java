@@ -11,6 +11,8 @@ import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 
@@ -57,6 +59,11 @@ public class HiveVisionHandler {
     /** Sentinel colour for ChromatiCraft's crystal hive: cycle through the rainbow instead of one fixed colour. */
     private static final int RAINBOW = -1;
 
+    /** Sentinel colour for ChromatiCraft's pure hive: each particle rolls either white or a clear blue. */
+    private static final int PURE_BLUE_WHITE = -2;
+
+    private static final int PURE_BLUE = 0x4C8CF5;
+
     /** Cached hive markers (x, y, z, colour quadruples) from the last scan. */
     private final List<int[]> hives = new ArrayList<>();
     private int ticksSinceScan = SCAN_INTERVAL_TICKS; // scan immediately on first powered tick
@@ -74,10 +81,7 @@ public class HiveVisionHandler {
         }
 
         ItemStack helmet = player.getCurrentArmor(3); // armor slots: 0=boots .. 3=helmet
-        if (helmet == null || !(helmet.getItem() instanceof ItemHiveGoggles)) {
-            return;
-        }
-        if (!ItemHiveGoggles.isPowered(player, helmet)) {
+        if (helmet == null || !isVisionActive(player, helmet)) {
             return;
         }
 
@@ -89,9 +93,48 @@ public class HiveVisionHandler {
 
         if (!hives.isEmpty() && world.getTotalWorldTime() % FX_INTERVAL_TICKS == 0) {
             for (int[] pos : hives) {
-                this.spawnHiveFX(world, pos[0], pos[1], pos[2], pos[3]);
+                // Fade the effect with distance. Underground hives (Extra Bees rock hives spawn at y 20-69, several
+                // attempts per chunk) otherwise blanket the whole view in sparkles the moment you look down - nearby
+                // hives keep the full effect, far/deep ones just glow faintly now and then.
+                double dist = Math.sqrt(player.getDistanceSq(pos[0] + 0.5, pos[1] + 0.5, pos[2] + 0.5));
+                float intensity = dist <= 16 ? 1F : (float) Math.max(0.1, 1 - (dist - 16) / 40);
+                this.spawnHiveFX(world, pos[0], pos[1], pos[2], pos[3], intensity);
             }
         }
+    }
+
+    /**
+     * The reveal is active when the wearer has either powered {@link ItemHiveGoggles}, or a Draconic helmet with the
+     * "Apiarist's Vision" tool-config toggle enabled (added by {@code MixinDraconicArmorFields}). The Draconic path is
+     * free, like the helmet's other passives (Night Vision etc.).
+     */
+    private static boolean isVisionActive(EntityPlayer player, ItemStack helmet) {
+        if (helmet.getItem() instanceof ItemHiveGoggles) {
+            return ItemHiveGoggles.isPowered(player, helmet);
+        }
+        return isDraconicHelmWithApiaristVision(helmet);
+    }
+
+    /**
+     * Reads the toggle straight from DE's config-profile NBT ({@code ConfigProfiles[ConfigProfile].ApiaristVision},
+     * see {@code IConfigurableItem.ProfileHelper}) so this class needs no Draconic Evolution classes at compile time.
+     */
+    private static boolean isDraconicHelmWithApiaristVision(ItemStack helmet) {
+        UniqueIdentifier uid = GameRegistry.findUniqueIdentifierFor(helmet.getItem());
+        if (uid == null || !"DraconicEvolution".equals(uid.modId) || !"draconicHelm".equals(uid.name)) {
+            return false;
+        }
+        NBTTagCompound tag = helmet.stackTagCompound;
+        if (tag == null) {
+            return false;
+        }
+        NBTTagList profiles = tag.getTagList("ConfigProfiles", 10 /* compound */);
+        int profile = tag.getInteger("ConfigProfile");
+        if (profile < 0 || profile >= profiles.tagCount()) {
+            return false;
+        }
+        return profiles.getCompoundTagAt(profile)
+            .getBoolean("ApiaristVision"); // absent = false, matching the field's default
     }
 
     private void rescan(World world, EntityPlayer player) {
@@ -158,7 +201,7 @@ public class HiveVisionHandler {
                 case 1:
                     return 0xE28C25; // FOREST
                 case 2:
-                    return 0xFFE649; // MEADOWS
+                    return 0xD8453C; // MEADOWS
                 case 3:
                     return 0xE8DCA4; // DESERT (Modest)
                 case 4:
@@ -178,32 +221,41 @@ public class HiveVisionHandler {
                 case 0:
                     return 0x3B7BE8; // WATER
                 case 1:
-                    return 0x8F8F8F; // ROCK
+                    return 0x50505E; // ROCK - dark slate; dim in the additive glow, far from the pure hive's white
                 case 2:
                     return 0xE83B3B; // NETHER
                 case 3:
-                    return 0xF0F0E8; // MARBLE
+                    return 0xEFE3BC; // MARBLE - warm cream, also distinct from pure white
                 default:
                     return 0x3B7BE8;
             }
         }
         if (mod.equals("chromaticraft")) {
-            return meta == 0 ? RAINBOW : 0xFFFFFF; // 0 crystal hive, 1 pure hive
+            return meta == 0 ? RAINBOW : PURE_BLUE_WHITE; // 0 crystal hive, 1 pure hive
         }
         return CrystalElement.LIGHTGRAY.getColor();
     }
 
-    /** The current colour of a rainbow-cycling marker: a full hue sweep every ~8 seconds. */
+    /**
+     * The current colour of a rainbow-cycling marker: ChromatiCraft's own 16-crystal-colour blend cycle
+     * ({@code CrystalElement.getBlendedColor}), ~1 second per element, so the crystal hive shimmers through the
+     * actual element palette.
+     */
     private static int rainbowColor(World world) {
-        float hue = (world.getTotalWorldTime() % 160) / 160F;
-        return java.awt.Color.HSBtoRGB(hue, 0.7F, 1F) & 0xFFFFFF;
+        return CrystalElement.getBlendedColor((int) world.getTotalWorldTime(), 20);
+    }
+
+    /** Two-tone colours resolve per particle: the pure hive rolls white or blue for every halo/sparkle it emits. */
+    private static int resolvePerParticle(int color) {
+        return color == PURE_BLUE_WHITE ? (rand.nextBoolean() ? 0xFFFFFF : PURE_BLUE) : color;
     }
 
     /**
-     * The Unknown-Artefact reveal in the hive's colour: an occasional large soft halo plus frequent small sparkles,
-     * all with the depth test off so they glow through the terrain between you and the hive.
+     * The Unknown-Artefact reveal in the hive's colour: an occasional large soft halo plus small sparkles, all with
+     * the depth test off so they glow through the terrain between you and the hive. {@code intensity} (0..1, from
+     * player distance) scales how often both spawn, so distant hives shimmer gently instead of strobing.
      */
-    private void spawnHiveFX(World world, int x, int y, int z, int color) {
+    private void spawnHiveFX(World world, int x, int y, int z, int color, float intensity) {
         if (color == RAINBOW) {
             color = rainbowColor(world);
         }
@@ -211,14 +263,14 @@ public class HiveVisionHandler {
         double cy = y + 0.5;
         double cz = z + 0.5;
 
-        if (rand.nextInt(3) == 0) {
+        if (rand.nextFloat() < intensity / 3F) {
             double px = ReikaRandomHelper.getRandomPlusMinus(cx, 0.75);
             double py = ReikaRandomHelper.getRandomPlusMinus(cy, 0.75);
             double pz = ReikaRandomHelper.getRandomPlusMinus(cz, 0.75);
             int l = ReikaRandomHelper.getRandomBetween(20, 45);
             float s = (float) (4 + rand.nextDouble() * 4);
             // lighten only slightly so the hive colour stays readable in the big halo
-            int c = ReikaColorAPI.mixColors(color, 0xffffff, 0.75F);
+            int c = ReikaColorAPI.mixColors(resolvePerParticle(color), 0xffffff, 0.75F);
             EntityCCBlurFX fx = new EntityCCBlurFX(world, px, py, pz);
             fx.setIcon(ChromaIcons.FADE_CLOUD)
                 .setColor(c)
@@ -229,19 +281,16 @@ public class HiveVisionHandler {
             Minecraft.getMinecraft().effectRenderer.addEffect(fx);
         }
 
-        int n = 1 + rand.nextInt(2);
+        int n = (rand.nextFloat() < 0.7F * intensity ? 1 : 0) + (intensity >= 0.8F && rand.nextBoolean() ? 1 : 0);
         for (int i = 0; i < n; i++) {
             double px = ReikaRandomHelper.getRandomPlusMinus(cx, 1D);
             double py = ReikaRandomHelper.getRandomPlusMinus(cy, 1D);
             double pz = ReikaRandomHelper.getRandomPlusMinus(cz, 1D);
-            int l = ReikaRandomHelper.getRandomBetween(5, 12);
-            double maxv = 0.125 / l;
-            double vx = ReikaRandomHelper.getRandomPlusMinus(0, maxv);
-            double vy = ReikaRandomHelper.getRandomPlusMinus(0, maxv);
-            double vz = ReikaRandomHelper.getRandomPlusMinus(0, maxv);
-            // sparkles carry the hive colour half-mixed toward white: bright, but still tinted
-            int c = ReikaColorAPI.mixColors(color, 0xffffff, 0.5F);
-            EntityCCBlurFX fx = new EntityCCBlurFX(world, px, py, pz, vx, vy, vz);
+            int l = ReikaRandomHelper.getRandomBetween(8, 14);
+            // sparkles carry the hive colour half-mixed toward white: bright, but still tinted. Zero velocity -
+            // these are markers, not ambience, and any drift can read as the particle "shooting off".
+            int c = ReikaColorAPI.mixColors(resolvePerParticle(color), 0xffffff, 0.5F);
+            EntityCCBlurFX fx = new EntityCCBlurFX(world, px, py, pz, 0, 0, 0);
             fx.setIcon(ChromaIcons.FADE_STAR)
                 .setColor(c)
                 .setLife(l)
