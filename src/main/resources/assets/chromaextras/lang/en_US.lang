@@ -1,2 +1,6 @@
 item.chromaextras.hive_goggles.name=Apiary Goggles
 button.de.ApiaristVision.name=Apiarist's Vision
+tile.chromaextras.void_vault.name=Void Vault
+container.chromaextras.void_vault=Void Vault
+tile.chromaextras.death_vault.name=Death Vault
+container.chromaextras.death_vault=Death Vault

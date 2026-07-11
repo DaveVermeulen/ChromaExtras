@@ -54,4 +54,8 @@ dependencies {
     // GTNH Draconic Evolution - compile-time only, for the late mixin adding the "Apiarist Vision" helmet toggle
     // (MixinDraconicArmorFields targets DraconicArmor.getFields). Provided at runtime by the modpack.
     compileOnly("com.github.GTNewHorizons:Draconic-Evolution:1.5.28-GTNH:dev")
+
+    // GTNH Waila - compile-time only, for the Void Vault owner tooltip (WailaVoidVault). Provided by the modpack;
+    // registration happens via IMC, so nothing breaks if Waila is absent at runtime.
+    compileOnly("com.github.GTNewHorizons:waila:1.8.2:dev")
 }
