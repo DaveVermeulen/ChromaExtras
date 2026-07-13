@@ -2,6 +2,7 @@
     "required": true,
     "minVersion": "0.8",
     "package": "com.tryrodave.chromaextras.latemixins",
+    "plugin": "com.tryrodave.chromaextras.mixinconfig.ChromaExtrasMixinPlugin",
     "refmap": "mixins.chromaextras.refmap.json",
     "target": "@env(DEFAULT)",
     "compatibilityLevel": "JAVA_8",

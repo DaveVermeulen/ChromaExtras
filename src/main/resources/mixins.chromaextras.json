@@ -2,11 +2,13 @@
     "required": true,
     "minVersion": "0.8",
     "package": "com.tryrodave.chromaextras.mixins",
+    "plugin": "com.tryrodave.chromaextras.mixinconfig.ChromaExtrasMixinPlugin",
     "refmap": "mixins.chromaextras.refmap.json",
     "target": "@env(DEFAULT)",
     "compatibilityLevel": "JAVA_8",
     "mixins": [
         "AccessorWorldGenInterceptionRegistry",
+        "MeteoritePlacerAccessor",
         "MixinAE2ExportProcess",
         "MixinBlockPylonStructure",
         "MixinCaveIndicatorGenerator",
@@ -23,19 +25,24 @@
         "MixinHiveGenerator",
         "MixinLavaRiverGenerator",
         "MixinLumaGenerator",
+        "MixinMeteoritePlacer",
+        "MixinMeteoriteSpawn",
         "MixinNetherStructureGenerator",
         "MixinPylonGenerator",
         "MixinTieredPlants",
         "MixinStructuredBlockArray",
         "MixinTieredWorldGenerator",
         "MixinTreeShaper",
-        "MixinWorldGenHiveWater",
+        "MixinVillagePiece",
+        "MixinWorldComparatorProbe",
         "MixinWorldGenTreeCluster",
         "MixinWorldGenTreeClusterShape"
     ],
     "client": [
         "MixinChromaBookGui",
+        "MixinReikaImageLoader",
         "MixinReikaRenderHelper",
+        "MixinReikaTextureHelper",
         "MixinTessellator"
     ]
 }

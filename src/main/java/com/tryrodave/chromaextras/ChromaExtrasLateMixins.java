@@ -26,6 +26,11 @@ public class ChromaExtrasLateMixins implements ILateMixinLoader {
         if (loadedMods.contains("DraconicEvolution")) {
             mixins.add("MixinDraconicArmorFields");
         }
+        // Extra Bees (Binnie) is a regular mod, invisible to the early config - its water-hive cascade guard must be
+        // applied here or it is silently dropped ("@Mixin target ... WorldGenHiveWater was not found").
+        if (loadedMods.contains("ExtraBees")) {
+            mixins.add("MixinWorldGenHiveWater");
+        }
         return mixins;
     }
 }

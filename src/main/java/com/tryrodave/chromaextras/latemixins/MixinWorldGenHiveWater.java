@@ -1,4 +1,4 @@
-package com.tryrodave.chromaextras.mixins;
+package com.tryrodave.chromaextras.latemixins;
 
 import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
@@ -17,6 +17,13 @@ import binnie.extrabees.worldgen.WorldGenHiveWater;
  * block below. When the rolled origin sits near a chunk edge, that +-7 offset lands in a not-yet-generated neighbor
  * chunk, and {@code getBlock} force-loads it mid-population -> cascading worldgen lag (every observed cascade in the
  * pack was one of these reads; Extra Bees runs as an {@code IWorldGenerator} routed through DragonAPI's interception).
+ *
+ * <p>
+ * This is a <b>late</b> mixin ({@link com.tryrodave.chromaextras.ChromaExtrasLateMixins}). Extra Bees is a regular
+ * (non-coremod) mod, so its classes are not on the classpath during the early tweaker-phase mixin config
+ * ({@code mixins.chromaextras.json}) - registering the mixin there just logs
+ * "@Mixin target binnie.extrabees.worldgen.WorldGenHiveWater was not found" and silently drops it, leaving the cascade
+ * unpatched. The late config applies after mod discovery, when the class is visible.
  *
  * <p>
  * Guard the read: if the target position's chunk is not currently loaded, report air instead of loading it. Air is not

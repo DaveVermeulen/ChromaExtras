@@ -19,6 +19,7 @@ import com.tryrodave.chromaextras.client.HiveVisionHandler;
 import com.tryrodave.chromaextras.client.RenderVoidVault;
 import com.tryrodave.chromaextras.command.CommandTeleportPlus;
 import com.tryrodave.chromaextras.compat.ChromaCastingRecipes;
+import com.tryrodave.chromaextras.compat.DragonApiLootFix;
 import com.tryrodave.chromaextras.items.ItemHiveGoggles;
 import com.tryrodave.chromaextras.util.DeferredGenSavedData;
 import com.tryrodave.chromaextras.util.DeferredStructureGen;
@@ -112,6 +113,7 @@ public class ChromaExtras {
     @Mod.EventHandler
     public void postInit(FMLPostInitializationEvent event) {
         ChromaCastingRecipes.register();
+        DragonApiLootFix.apply();
     }
 
     /** Client-only bodies live in a separate method so the classes never load on a dedicated server. */
